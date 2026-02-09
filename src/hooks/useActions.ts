@@ -17,18 +17,51 @@ export function useActions() {
   const [sending, setSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  /* -- Poll inbox (triggers classification on server) -- */
+  /* -- Poll inbox for both Gmail and Outlook -- */
   const pollInbox = useCallback(async () => {
     try {
-      const res = await fetch("/api/gmail/inbox");
-      if (res.status === 401) {
+      // Poll both Gmail and Outlook in parallel
+      const results = await Promise.allSettled([
+        fetch("/api/gmail/inbox"),
+        fetch("/api/outlook/inbox"),
+      ]);
+
+      // Check if at least one provider is authenticated
+      const allUnauth = results.every(
+        (r) => r.status === "fulfilled" && r.value.status === 401
+      );
+
+      if (allUnauth) {
         setAppStatus("unauthenticated");
         return;
       }
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || `Failed (${res.status})`);
+
+      // Check for errors (non-401 errors)
+      const errors: string[] = [];
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          const res = result.value;
+          if (!res.ok && res.status !== 401) {
+            try {
+              const d = await res.json();
+              errors.push(d.error || `Failed (${res.status})`);
+            } catch {
+              errors.push(`Failed (${res.status})`);
+            }
+          }
+        } else {
+          errors.push(result.reason?.message || "Network error");
+        }
       }
+
+      if (errors.length > 0 && errors.length === results.length) {
+        // All providers failed
+        setError(errors.join("; "));
+        setAppStatus("error");
+        return;
+      }
+
+      // At least one succeeded
       setAppStatus("ok");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

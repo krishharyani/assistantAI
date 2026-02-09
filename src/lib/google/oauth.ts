@@ -83,3 +83,24 @@ export async function refreshAccessToken(
   tokens.refresh_token = tokens.refresh_token ?? refreshToken;
   return tokens;
 }
+
+export interface GoogleUserInfo {
+  email: string;
+  name?: string;
+  picture?: string;
+}
+
+export async function getGoogleUserInfo(
+  accessToken: string,
+): Promise<GoogleUserInfo> {
+  const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to get user info (${res.status}): ${err}`);
+  }
+
+  return (await res.json()) as GoogleUserInfo;
+}

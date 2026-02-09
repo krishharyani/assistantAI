@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFullMessage } from "@/lib/google/gmail";
-import { getAllGoogleAccessTokens } from "@/lib/google/getAccessToken";
-import { normalizeGmailMessage } from "@/lib/email/normalize";
+import { getMessage } from "@/lib/microsoft/outlook";
+import { getAllMicrosoftAccessTokens } from "@/lib/microsoft/getAccessToken";
+import { normalizeOutlookMessage } from "@/lib/email/normalize";
 import { hasProcessedEmail, getAction } from "@/lib/store/actions";
 import { hasProviderAccounts } from "@/lib/auth/tokenStore";
 
@@ -11,11 +11,11 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  if (!hasProviderAccounts("google")) {
+  if (!hasProviderAccounts("microsoft")) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const accounts = await getAllGoogleAccessTokens();
+  const accounts = await getAllMicrosoftAccessTokens();
   if (accounts.length === 0) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -23,9 +23,9 @@ export async function GET(
   try {
     // Try each account until we find the message
     for (const { email: accountEmail, accessToken } of accounts) {
-      const full = await getFullMessage(accessToken, id);
+      const full = await getMessage(accessToken, id);
       if (full) {
-        const normalized = normalizeGmailMessage(full, accountEmail);
+        const normalized = normalizeOutlookMessage(full, accountEmail);
         const action = hasProcessedEmail(id) ? getAction(id) : undefined;
         const isImportant =
           action?.status === "pending" || action?.status === "approved";

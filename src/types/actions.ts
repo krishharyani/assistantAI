@@ -1,3 +1,5 @@
+export type EmailSource = "gmail" | "outlook";
+
 export interface CalendarEventSummary {
   title: string;
   date: string;
@@ -17,6 +19,8 @@ export interface ActionSummary {
   status: string;
   calendarEvent?: CalendarEventSummary;
   createdAt: number;
+  source: EmailSource;
+  accountEmail: string;
 }
 
 export interface ChatMsg {
@@ -38,6 +42,8 @@ export interface ActionDetail {
   calendarEvent?: CalendarEventSummary;
   chatHistory: ChatMsg[];
   status: string;
+  source: EmailSource;
+  accountEmail: string;
 }
 
 export type AppStatus = "loading" | "ok" | "unauthenticated" | "error";
@@ -52,6 +58,8 @@ export interface InboxEmail {
   date: string;
   actionId: string | null;
   isImportant: boolean;
+  source: EmailSource;
+  accountEmail: string;
 }
 
 export interface InboxEmailDetail {
@@ -66,4 +74,6 @@ export interface InboxEmailDetail {
   hasAttachments: boolean;
   actionId: string | null;
   isImportant: boolean;
+  source: EmailSource;
+  accountEmail: string;
 }

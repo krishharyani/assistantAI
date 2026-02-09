@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
+import { buildMicrosoftAuthUrl } from "@/lib/microsoft/oauth";
 
 export async function GET() {
-  // TODO: Implement Microsoft OAuth flow (MS Graph / MSAL)
-  return NextResponse.json(
-    { error: "Microsoft OAuth not yet implemented" },
-    { status: 501 },
-  );
+  const url = buildMicrosoftAuthUrl();
+  return NextResponse.redirect(url);
 }

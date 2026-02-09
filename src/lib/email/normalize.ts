@@ -1,7 +1,11 @@
 // Email parsing and normalization
-// Converts raw Gmail API payloads into a clean, provider-agnostic structure.
+// Converts raw Gmail/Outlook API payloads into a clean, provider-agnostic structure.
 
 import type { GmailFullMessage, GmailMessagePart } from "@/lib/google/gmail";
+import type { OutlookMessage } from "@/lib/microsoft/outlook";
+import { stripHtml } from "@/lib/microsoft/outlook";
+
+export type EmailSource = "gmail" | "outlook";
 
 export interface NormalizedEmail {
   id: string;
@@ -16,6 +20,8 @@ export interface NormalizedEmail {
   labels: string[];
   hasAttachments: boolean;
   messageId: string;
+  source: EmailSource;
+  accountEmail: string;
 }
 
 function decodeBase64Url(data: string): string {
@@ -62,10 +68,14 @@ function extractBodies(part: GmailMessagePart): {
   return { text, html, hasAttachments };
 }
 
-export function normalizeGmailMessage(raw: GmailFullMessage): NormalizedEmail {
+export function normalizeGmailMessage(
+  raw: GmailFullMessage,
+  accountEmail: string
+): NormalizedEmail {
   const headers = raw.payload.headers ?? [];
   const header = (name: string) =>
-    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ??
+    "";
 
   const { text, html, hasAttachments } = extractBodies(raw.payload);
 
@@ -82,5 +92,46 @@ export function normalizeGmailMessage(raw: GmailFullMessage): NormalizedEmail {
     labels: raw.labelIds ?? [],
     hasAttachments,
     messageId: header("Message-ID") || header("Message-Id"),
+    source: "gmail",
+    accountEmail,
+  };
+}
+
+export function normalizeOutlookMessage(
+  msg: OutlookMessage,
+  accountEmail: string
+): NormalizedEmail {
+  const bodyText =
+    msg.body.contentType === "text"
+      ? msg.body.content
+      : stripHtml(msg.body.content);
+
+  const bodyHtml =
+    msg.body.contentType === "html" ? msg.body.content : "";
+
+  return {
+    id: msg.id,
+    threadId: msg.conversationId,
+    from: {
+      name: msg.from.emailAddress.name,
+      email: msg.from.emailAddress.address,
+    },
+    to: msg.toRecipients.map((r) => ({
+      name: r.emailAddress.name,
+      email: r.emailAddress.address,
+    })),
+    cc: msg.ccRecipients.map((r) => ({
+      name: r.emailAddress.name,
+      email: r.emailAddress.address,
+    })),
+    subject: msg.subject,
+    bodyText,
+    bodyHtml,
+    date: new Date(msg.receivedDateTime),
+    labels: [], // Outlook doesn't have labels like Gmail
+    hasAttachments: msg.hasAttachments,
+    messageId: msg.internetMessageId,
+    source: "outlook",
+    accountEmail,
   };
 }

@@ -70,7 +70,7 @@ export function TaskListItem({ task, selected, onClick }: TaskListItemProps) {
         <StatusIcon
           className={cn("mt-0.5 h-4 w-4 shrink-0", statusColors[task.status])}
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <div
             className={cn(
               "truncate text-sm font-semibold text-text-primary",
@@ -83,19 +83,17 @@ export function TaskListItem({ task, selected, onClick }: TaskListItemProps) {
             {task.description}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {dueDateInfo && (
-            <span
-              className={cn(
-                "flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-                dueDateInfo.className,
-              )}
-            >
-              <Calendar className="h-3 w-3" />
-              {dueDateInfo.label}
-            </span>
-          )}
-        </div>
+        {dueDateInfo && (
+          <span
+            className={cn(
+              "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium",
+              dueDateInfo.className,
+            )}
+          >
+            <Calendar className="h-3 w-3 shrink-0" />
+            {dueDateInfo.label}
+          </span>
+        )}
       </div>
     </button>
   );

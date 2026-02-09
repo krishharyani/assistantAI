@@ -3,6 +3,7 @@ import { getCategoryBadgeClasses } from "@/lib/ui/categoryColors";
 import { timeAgo } from "@/lib/ui/formatTime";
 import { cn } from "@/lib/utils";
 import { CalendarDays } from "lucide-react";
+import { SourceBadge } from "./SourceBadge";
 
 interface ActionListItemProps {
   action: ActionSummary;
@@ -41,6 +42,7 @@ export function ActionListItem({
           <span className="text-[10px] text-text-tertiary">
             {timeAgo(action.createdAt)}
           </span>
+          <SourceBadge source={action.source} showLabel={false} />
           {action.calendarEvent && (
             <span className="flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
               <CalendarDays className="h-3 w-3" />

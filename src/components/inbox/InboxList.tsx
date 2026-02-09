@@ -1,9 +1,16 @@
-import type { InboxEmail } from "@/types/actions";
+import type { InboxEmail, EmailSource } from "@/types/actions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RefreshCw, Loader2, Mail, Sparkles } from "lucide-react";
+import { SourceBadge } from "./SourceBadge";
+import { AccountSelector } from "./AccountSelector";
+
+interface Account {
+  provider: EmailSource;
+  email: string;
+}
 
 interface InboxListProps {
   emails: InboxEmail[];
@@ -13,6 +20,9 @@ interface InboxListProps {
   onRefresh: () => void;
   hasMore: boolean;
   loading: boolean;
+  accounts?: Account[];
+  selectedAccount?: "all" | string;
+  onAccountChange?: (account: "all" | string) => void;
 }
 
 function formatDate(raw: string): string {
@@ -79,6 +89,7 @@ function InboxListItem({
           <span className="text-[10px] text-text-tertiary">
             {formatDate(email.date)}
           </span>
+          <SourceBadge source={email.source} showLabel={false} />
           {email.isImportant && (
             <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
               <Sparkles className="h-3 w-3" />
@@ -99,33 +110,49 @@ export function InboxList({
   onRefresh,
   hasMore,
   loading,
+  accounts = [],
+  selectedAccount = "all",
+  onAccountChange,
 }: InboxListProps) {
+  const showAccountSelector = accounts.length > 1 && onAccountChange;
+
   return (
     <div className="flex w-[360px] shrink-0 flex-col border-r border-border bg-surface">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-text-primary">
-            All Mail
-          </h2>
-          {emails.length > 0 && (
-            <Badge
-              variant="secondary"
-              className="bg-primary-100 text-primary-700 hover:bg-primary-100"
-            >
-              {emails.length}
-            </Badge>
-          )}
+      <div className="border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold text-text-primary">
+              All Mail
+            </h2>
+            {emails.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="bg-primary-100 text-primary-700 hover:bg-primary-100"
+              >
+                {emails.length}
+              </Badge>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-text-secondary hover:text-text-primary"
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-text-secondary hover:text-text-primary"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-        </Button>
+        {showAccountSelector && (
+          <div className="px-4 pb-3">
+            <AccountSelector
+              selectedAccount={selectedAccount}
+              onAccountChange={onAccountChange}
+              accounts={accounts}
+            />
+          </div>
+        )}
       </div>
 
       {/* List */}

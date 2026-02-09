@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCodeForTokens } from "@/lib/google/oauth";
-import { saveTokens } from "@/lib/google/tokenStore";
+import { exchangeCodeForTokens, getGoogleUserInfo } from "@/lib/google/oauth";
+import { saveTokens } from "@/lib/auth/tokenStore";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -14,14 +14,29 @@ export async function GET(request: NextRequest) {
 
   try {
     const tokens = await exchangeCodeForTokens(code);
-    saveTokens(tokens);
 
-    return NextResponse.json({
-      ok: true,
-      message: "Google OAuth complete — tokens saved to .tokens.json",
+    // Fetch user email to identify the account
+    const userInfo = await getGoogleUserInfo(tokens.access_token);
+
+    // Save tokens with provider and email
+    saveTokens({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_in: tokens.expires_in,
+      token_type: tokens.token_type,
+      scope: tokens.scope,
+      obtained_at: Date.now(),
+      email: userInfo.email,
+      provider: "google",
     });
+
+    // Redirect to home page after successful authentication
+    return NextResponse.redirect(new URL("/", request.url));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Redirect to home with error parameter instead of showing JSON
+    const errorUrl = new URL("/", request.url);
+    errorUrl.searchParams.set("auth_error", message);
+    return NextResponse.redirect(errorUrl);
   }
 }

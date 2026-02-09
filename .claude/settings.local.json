@@ -5,7 +5,9 @@
       "Bash(npx shadcn@latest init:*)",
       "Bash(npx shadcn@latest add button input textarea badge scroll-area tooltip separator card -y)",
       "Bash(npx tsc:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint:*)"
     ]
   }
 }

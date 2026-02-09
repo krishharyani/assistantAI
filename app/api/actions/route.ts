@@ -13,6 +13,8 @@ export async function GET() {
     suggestedReply: a.suggestedReply,
     calendarEvent: a.calendarEvent ?? null,
     createdAt: a.createdAt,
+    source: a.email.source,
+    accountEmail: a.email.accountEmail,
   }));
 
   return NextResponse.json({ actions });

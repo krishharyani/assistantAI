@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import {
   listMessages,
-  getFullMessage,
-  modifyMessage,
-} from "@/lib/google/gmail";
-import { getAllGoogleAccessTokens } from "@/lib/google/getAccessToken";
-import { normalizeGmailMessage } from "@/lib/email/normalize";
+  getMessage,
+  markAsRead,
+  getJunkFolderId,
+} from "@/lib/microsoft/outlook";
+import { getAllMicrosoftAccessTokens } from "@/lib/microsoft/getAccessToken";
+import { normalizeOutlookMessage } from "@/lib/email/normalize";
 import { classifyEmail } from "@/lib/ai/classify";
 import { generateReply } from "@/lib/ai/generateReply";
 import { detectCalendarEvent } from "@/lib/ai/detectEvent";
@@ -14,33 +15,23 @@ import { hasProviderAccounts } from "@/lib/auth/tokenStore";
 
 const MAX_CLASSIFY_PER_POLL = 5;
 
-// Gmail labels that are never important — skip OpenAI entirely
-const SKIP_LABELS = new Set([
-  "CATEGORY_PROMOTIONS",
-  "CATEGORY_SOCIAL",
-  "CATEGORY_UPDATES",
-  "CATEGORY_FORUMS",
-  "SPAM",
-  "TRASH",
-]);
-
 export async function GET() {
-  if (!hasProviderAccounts("google")) {
+  if (!hasProviderAccounts("microsoft")) {
     return NextResponse.json(
-      { error: "No Google accounts connected." },
+      { error: "No Microsoft accounts connected." },
       { status: 401 }
     );
   }
 
   try {
-    // Get tokens for all connected Google accounts
-    const accounts = await getAllGoogleAccessTokens();
+    // Get tokens for all connected Microsoft accounts
+    const accounts = await getAllMicrosoftAccessTokens();
 
     if (accounts.length === 0) {
       return NextResponse.json(
         {
           error:
-            "Not authenticated. Visit /api/auth/google/start to connect.",
+            "Not authenticated with Microsoft. Visit /api/auth/microsoft/start to connect.",
         },
         { status: 401 }
       );
@@ -53,40 +44,70 @@ export async function GET() {
     // Process each account
     for (const { email: accountEmail, accessToken } of accounts) {
       try {
-        const messages = await listMessages(accessToken, {
-          maxResults: 20,
-          query: "is:unread",
+        // Get junk folder ID to filter out junk mail
+        const junkFolderId = await getJunkFolderId(accessToken);
+
+        // Fetch unread messages
+        const { messages } = await listMessages(accessToken, {
+          top: 20,
+          filter: "isRead eq false",
+          orderby: "receivedDateTime desc",
+          select: [
+            "id",
+            "conversationId",
+            "subject",
+            "bodyPreview",
+            "from",
+            "receivedDateTime",
+            "isRead",
+            "hasAttachments",
+            "parentFolderId",
+          ],
         });
 
         totalMessages += messages.length;
 
-        // Mark skipped-label emails as processed so they don't get re-checked
-        const unprocessed = messages.filter((m) => !hasProcessedEmail(m.id));
-        for (const msg of unprocessed) {
-          if (msg.labelIds.some((l) => SKIP_LABELS.has(l))) {
+        // Filter out junk/deleted items
+        const filteredMessages = messages.filter((m) => {
+          // Skip if in junk folder
+          if (junkFolderId && m.parentFolderId === junkFolderId) {
+            return false;
+          }
+          return true;
+        });
+
+        // Mark junk as processed
+        const junkMessages = messages.filter(
+          (m) => junkFolderId && m.parentFolderId === junkFolderId
+        );
+        for (const msg of junkMessages) {
+          if (!hasProcessedEmail(msg.id)) {
             upsertAction({
               id: msg.id,
               email: {
                 id: msg.id,
-                threadId: msg.threadId,
-                from: { name: "", email: "" },
+                threadId: msg.conversationId,
+                from: {
+                  name: msg.from.emailAddress.name,
+                  email: msg.from.emailAddress.address,
+                },
                 to: [],
                 cc: [],
                 subject: msg.subject,
-                bodyText: "",
+                bodyText: msg.bodyPreview,
                 bodyHtml: "",
-                date: new Date(),
-                labels: msg.labelIds,
-                hasAttachments: false,
+                date: new Date(msg.receivedDateTime),
+                labels: [],
+                hasAttachments: msg.hasAttachments,
                 messageId: "",
-                source: "gmail",
+                source: "outlook",
                 accountEmail,
               },
               classification: {
-                category: "other",
+                category: "spam",
                 important: false,
                 confidence: 1,
-                reasoning: "Skipped by label filter",
+                reasoning: "Message is in Junk folder",
               },
               suggestedReply: { subject: "", body: "" },
               chatHistory: [],
@@ -96,27 +117,25 @@ export async function GET() {
           }
         }
 
-        const toClassify = unprocessed
-          .filter((m) => !m.labelIds.some((l) => SKIP_LABELS.has(l)))
+        // Get unprocessed messages to classify
+        const toClassify = filteredMessages
           .filter((m) => !hasProcessedEmail(m.id))
           .slice(0, MAX_CLASSIFY_PER_POLL);
 
         for (const msg of toClassify) {
-          const full = await getFullMessage(accessToken, msg.id);
-          if (!full) continue;
+          const fullMessage = await getMessage(accessToken, msg.id);
+          if (!fullMessage) continue;
 
-          const email = normalizeGmailMessage(full, accountEmail);
+          const email = normalizeOutlookMessage(fullMessage, accountEmail);
           const [classification, calendarEvent] = await Promise.all([
             classifyEmail(email),
             detectCalendarEvent(email),
           ]);
 
-          // Mark as read in Gmail so it won't reappear after server restart
-          await modifyMessage(accessToken, msg.id, {
-            removeLabelIds: ["UNREAD"],
-          });
+          // Mark as read in Outlook so it won't reappear after server restart
+          await markAsRead(accessToken, msg.id);
 
-          // Promote non-important emails to pending if they contain a calendar event
+          // Surface important emails or those with calendar events
           const shouldSurface =
             classification.important || calendarEvent !== null;
 
