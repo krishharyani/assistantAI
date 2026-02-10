@@ -12,6 +12,7 @@ export async function GET() {
     status: a.status,
     suggestedReply: a.suggestedReply,
     calendarEvent: a.calendarEvent ?? null,
+    detectedTasks: a.detectedTasks ?? [],
     createdAt: a.createdAt,
     source: a.email.source,
     accountEmail: a.email.accountEmail,

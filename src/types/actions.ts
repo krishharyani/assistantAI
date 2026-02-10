@@ -10,6 +10,13 @@ export interface CalendarEventSummary {
   isAllDay: boolean;
 }
 
+export interface DetectedTaskSummary {
+  name: string;
+  description: string;
+  dueDate: string | null;
+  priority: "high" | "medium" | "low";
+}
+
 export interface ActionSummary {
   id: string;
   from: { name: string; email: string };
@@ -18,6 +25,7 @@ export interface ActionSummary {
   category: string;
   status: string;
   calendarEvent?: CalendarEventSummary;
+  detectedTasks?: DetectedTaskSummary[];
   createdAt: number;
   source: EmailSource;
   accountEmail: string;
@@ -40,6 +48,7 @@ export interface ActionDetail {
   classification: { category: string; reasoning: string };
   suggestedReply: { subject: string; body: string };
   calendarEvent?: CalendarEventSummary;
+  detectedTasks?: DetectedTaskSummary[];
   chatHistory: ChatMsg[];
   status: string;
   source: EmailSource;

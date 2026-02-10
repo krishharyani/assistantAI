@@ -10,7 +10,9 @@ import { normalizeOutlookMessage } from "@/lib/email/normalize";
 import { classifyEmail } from "@/lib/ai/classify";
 import { generateReply } from "@/lib/ai/generateReply";
 import { detectCalendarEvent } from "@/lib/ai/detectEvent";
+import { detectEmailTasks } from "@/lib/ai/detectTasks";
 import { hasProcessedEmail, upsertAction } from "@/lib/store/actions";
+import { createTask } from "@/lib/store/tasks";
 import { hasProviderAccounts } from "@/lib/auth/tokenStore";
 
 const MAX_CLASSIFY_PER_POLL = 5;
@@ -127,17 +129,18 @@ export async function GET() {
           if (!fullMessage) continue;
 
           const email = normalizeOutlookMessage(fullMessage, accountEmail);
-          const [classification, calendarEvent] = await Promise.all([
+          const [classification, calendarEvent, detectedTasks] = await Promise.all([
             classifyEmail(email),
             detectCalendarEvent(email),
+            detectEmailTasks(email),
           ]);
 
           // Mark as read in Outlook so it won't reappear after server restart
           await markAsRead(accessToken, msg.id);
 
-          // Surface important emails or those with calendar events
+          // Surface important emails or those with calendar events or tasks
           const shouldSurface =
-            classification.important || calendarEvent !== null;
+            classification.important || calendarEvent !== null || detectedTasks.length > 0;
 
           if (shouldSurface) {
             const suggestedReply = await generateReply(email);
@@ -150,7 +153,30 @@ export async function GET() {
               if (calendarEvent.location)
                 chatContent += ` — ${calendarEvent.location}`;
             }
+            if (detectedTasks.length > 0) {
+              chatContent += `\n\n✅ **Tasks detected (${detectedTasks.length}):**`;
+              for (const task of detectedTasks) {
+                chatContent += `\n• ${task.name}`;
+                if (task.dueDate) chatContent += ` (due ${task.dueDate})`;
+              }
+            }
             chatContent += `\n\nI've drafted a reply for you. You can edit it, ask me to revise it, or approve and send it.`;
+
+            // Create tasks in the task store
+            for (const task of detectedTasks) {
+              createTask({
+                id: crypto.randomUUID(),
+                name: task.name,
+                description: task.description,
+                dueDate: task.dueDate,
+                status: "todo",
+                source: "email",
+                folderId: null,
+                createdAt: Date.now(),
+                sourceActionId: email.id,
+                sourceEmailSubject: email.subject,
+              });
+            }
 
             upsertAction({
               id: email.id,
@@ -158,6 +184,7 @@ export async function GET() {
               classification,
               suggestedReply,
               calendarEvent: calendarEvent ?? undefined,
+              detectedTasks: detectedTasks.length > 0 ? detectedTasks : undefined,
               chatHistory: [
                 {
                   role: "assistant",

@@ -2,6 +2,7 @@ import type { NormalizedEmail } from "@/lib/email/normalize";
 import type { EmailClassification } from "@/lib/ai/classify";
 import type { GeneratedReply } from "@/lib/ai/generateReply";
 import type { CalendarEvent } from "@/lib/ai/detectEvent";
+import type { DetectedTask } from "@/lib/ai/detectTasks";
 
 export interface ChatMessage {
   role: "assistant" | "user";
@@ -15,6 +16,7 @@ export interface Action {
   classification: EmailClassification;
   suggestedReply: GeneratedReply;
   calendarEvent?: CalendarEvent;
+  detectedTasks?: DetectedTask[];
   chatHistory: ChatMessage[];
   status: "pending" | "approved" | "sent" | "dismissed";
   createdAt: number;

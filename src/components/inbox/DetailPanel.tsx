@@ -1,6 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmailHeader } from "./EmailHeader";
 import { CalendarEventCard } from "./CalendarEventCard";
+import { DetectedTasksCard } from "./DetectedTasksCard";
 import { SuggestedReply } from "./SuggestedReply";
 import { ChatMessages } from "./ChatMessages";
 import { ChatInput } from "./ChatInput";
@@ -32,6 +33,10 @@ export function DetailPanel(props: DetailPanelProps) {
       <ScrollArea className="flex-1 px-6 py-4">
         {detail.calendarEvent && (
           <CalendarEventCard event={detail.calendarEvent} />
+        )}
+
+        {detail.detectedTasks && detail.detectedTasks.length > 0 && (
+          <DetectedTasksCard tasks={detail.detectedTasks} />
         )}
 
         <SuggestedReply
